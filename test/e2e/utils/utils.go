@@ -83,6 +83,7 @@ func GCEClientAndDriverSetup(instance *remote.InstanceInfo, driverConfig DriverC
 	// useful to see what's happening when debugging tests.
 	driverRunCmd := fmt.Sprintf("sh -c '/usr/bin/nohup %s/gce-pd-csi-driver -v=6 --endpoint=%s %s 2> %s/prog.out < /dev/null > /dev/null &'",
 		workspace, endpoint, strings.Join(extra_flags, " "), workspace)
+	klog.Infof("driverCmd %s", driverRunCmd)
 	config := &remote.ClientConfig{
 		PkgPath:      pkgPath,
 		BinPath:      binPath,
