@@ -21,6 +21,7 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -78,12 +79,13 @@ func TestE2E(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	var err error
-	tcc := make(chan *remote.TestContext)
-	hdtcc := make(chan *remote.TestContext)
+	numberOfInstancesPerZone := 2
+	zones := strings.Split(*zones, ",")
+	tcc := make(chan *remote.TestContext, len(zones)*numberOfInstancesPerZone)
+	hdtcc := make(chan *remote.TestContext, len(zones))
 	defer close(tcc)
 	defer close(hdtcc)
 
-	zones := strings.Split(*zones, ",")
 	rand.Seed(time.Now().UnixNano())
 
 	computeService, err = remote.GetComputeClient()
@@ -108,20 +110,23 @@ var _ = BeforeSuite(func() {
 
 	klog.Infof("Running in project %v with service account %v", *project, *serviceAccount)
 
-	numberOfInstancesPerZone := 2
-
 	setupContext := func(zone string) {
+		var wg sync.WaitGroup
 		// Create 2 instances for each zone as we need 2 instances each zone for certain test cases
 		for j := 0; j < numberOfInstancesPerZone; j++ {
+			wg.Add(1)
 			go func(curZone string, randInt int) {
 				defer GinkgoRecover()
+				defer wg.Done()
 				tcc <- NewDefaultTestContext(curZone, strconv.Itoa(randInt))
 			}(zone, j)
 		}
 		go func(curZone string) {
 			defer GinkgoRecover()
+			defer wg.Done()
 			hdtcc <- NewTestContext(curZone, *hdMinCpuPlatform, *hdMachineType, "0")
 		}(zone)
+		wg.Wait()
 	}
 
 	for _, zone := range zones {
